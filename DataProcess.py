@@ -1,8 +1,6 @@
 import re
 import zlib, base64 
 
-from Controller import *
-
 class DataProcess():
     @staticmethod
     def make_file_friendly_name(text):

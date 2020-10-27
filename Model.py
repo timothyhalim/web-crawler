@@ -1,7 +1,8 @@
+import os
 from peewee import *
 import datetime
 
-db_path = "Novel.db"
+db_path = os.path.join( __file__, "..", "Novel.db" )
 db = SqliteDatabase(db_path)
 
 class BaseModel(Model):
@@ -9,37 +10,36 @@ class BaseModel(Model):
         database = db
 
 class Author(BaseModel):
-    name = CharField(unique=True)
+    name = CharField(unique=True, constraints=[SQL('COLLATE NOCASE')])
 
 class Genre(BaseModel):
-    name = CharField(unique=True)
+    name = CharField(unique=True, constraints=[SQL('COLLATE NOCASE')])
 
 class Status(BaseModel):
-    name = CharField(unique=True)
+    name = CharField(unique=True, constraints=[SQL('COLLATE NOCASE')])
 
 class Book(BaseModel):
     title = CharField(unique=True)
-    authors = ForeignKeyField(Author, backref='authors')
-    genres = ForeignKeyField(Author, backref='genres')
     summary = TextField()
     status = ForeignKeyField(Status, backref='statuses')
 
 class Chapter(BaseModel):
     book = ForeignKeyField(Book, backref='chapters')
+    title = CharField()
     content = TextField()
     created_date = DateTimeField(default=datetime.datetime.now)
     is_published = BooleanField(default=True)
 
-def init():
-    db.connect()
-    db.create_tables([Author, Genre, Status, Book, Chapter])
-    return db
+class BookAuthor(BaseModel):
+    book = ForeignKeyField(Book)
+    author = ForeignKeyField(Author)
 
-def create_author(name):
-    author = Author.create(name=name)
-    return author
+    class Meta:
+        primary_key = CompositeKey('book', 'author')
 
-def create_book(title, authors=[], genres=[], summary="", status=""):
-    for author in authors:
+class BookGenre(BaseModel):
+    book = ForeignKeyField(Book)
+    genre = ForeignKeyField(Genre)
 
-    book = Book.create(title=title, authors=[], genres=[], summary="", status="")
+    class Meta:
+        primary_key = CompositeKey('book', 'genre')
