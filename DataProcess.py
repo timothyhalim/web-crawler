@@ -31,7 +31,7 @@ class DataProcess():
         s = re.sub(r'(\*{2})(.*?)(\*{2})', r"<strong>\2</strong>", s)
         s = re.sub(r'(\*{1})(.*?)(\*{1})', r"<em>\2</em>", s)
         
-        s = f"<p>{s.rstrip().lstrip()}</p>"
+        s = f"<p>{s}</p>"
         
         return s
 
