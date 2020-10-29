@@ -19,14 +19,30 @@ class Status(BaseModel):
     name = CharField(unique=True, constraints=[SQL('COLLATE NOCASE')])
 
 class Book(BaseModel):
-    title = CharField(unique=True)
+    title = CharField()
+    fullurl = CharField(unique=True)
+    url = CharField()
     summary = TextField()
-    release = DateField(default=datetime.datetime.now().strftime('%Y'))
-    status = ForeignKeyField(Status, backref='statuses')
+    release = CharField(unique=True)
+    status = ForeignKeyField(Status)
+
+    def chapters(self):
+        chapters = [chapter for chapter in Chapter.select().where(Chapter.book == self.id)]
+        return chapters
+
+    def authors(self):
+        authors = (BookAuthor.select().where(BookAuthor.book == self.id))
+        return authors
+
+    def genres(self):
+        genres = (BookGenre.select().where(BookGenre.book == self.id))
+        return genres
 
 class Chapter(BaseModel):
-    book = ForeignKeyField(Book, backref='chapters')
+    book = ForeignKeyField(Book)
     title = CharField()
+    fullurl = CharField(unique=True)
+    url = CharField()
     content = TextField()
     created_date = DateTimeField(default=datetime.datetime.now)
     is_published = BooleanField(default=True)

@@ -1,68 +1,99 @@
+import re
+
 import scrapy
 
-class BookSpider(scrapy.Spider):
+from . import Controller
+from .DataProcess import DataProcess
+
+class ReaderSpider(scrapy.Spider):
     name = "book"
 
     def __init__(self, books=[], **kwargs):
         if isinstance(books,str):
             books = [books]
+        Controller.init()
         self.start_urls = [f'https://daonovel.com/novel/{book}/' for book in sorted(books)]
         super().__init__(**kwargs) 
 
     def parse(self, response):
-        # self.remove_content(response.css("div.post-title h1 span"))
-        fullurl = response.url
-        url = fullurl.split("/")[-2]
-        title = response.css("div.post-title h1::text").extract()
-        title = title[len(title)-1].strip()
-        authors = response.css('div.author-content a::text').getall()
-        genres = response.css('div.genres-content a::text').getall()
-        release = response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content::text').get().strip()
-        status = response.css('div.post-status div.post-content_item:nth-child(2) div.summary-content::text').get().strip()
-        summary = response.css('div.summary__content p').getall()
-
-        chapters = response.css('ul.version-chap li a::attr(href)').extract()
-        chapters.reverse()
-
-        return {
-            'fullurl' : fullurl,
-            'url' : url,
-            'title' : title,
-            'authors' : authors,
-            'genres' : genres,
-            'status' : status,
-            'release' : release,
-            'summary' : summary,
-            'chapters' : chapters
+        # Compile Data
+        book = {
+            'fullurl' : response.url,
+            'url' : response.url.split("/")[-2],
+            'title' : response.css("div.post-title h1::text").extract()[-1].strip(),
+            'authors' : response.css('div.author-content a::text').getall(),
+            'genres' : response.css('div.genres-content a::text').getall(),
+            'status' : response.css('div.post-status div.post-content_item:nth-child(2) div.summary-content::text').get().strip(),
+            'release' : response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content::text').get().strip(),
+            'summary' : response.css('div.summary__content p').getall(),
+            'chapters' : []
         }
+        # Cleanup Data
+        book['authors'] = [author.strip() for author in book['authors']]
+        book['genres'] = [genre.strip() for genre in book['genres']]
 
-class ChapterSpider(scrapy.Spider):
-    name = "chapter"
+        summary = []
+        for line in book['summary']:
+            if not any(word in line.lower() for word in ("wuxiaworld", "disclaimer")) :
+                summary += [DataProcess.fix_bracket(s) for s in re.findall("^<p>(.+)</p>$", line)]
+        book['summary'] = str("\n").join(summary)
 
-    def __init__(self, book="", chapters=[], **kwargs):
-        if isinstance(chapters,str):
-            chapters = [chapters]
-        self.book = book
-        self.start_urls = [f'https://daonovel.com/novel/{book}/{chapter}/' for chapter in chapters]
-        super().__init__(**kwargs) 
+        #Submit to db
+        book = Controller.create_book(
+                        book['title'], 
+                        book['fullurl'], 
+                        book['url'], 
+                        authors=book['authors'], 
+                        genres=book['genres'], 
+                        summary=DataProcess.encode_text(book['summary']), 
+                        status=book['status'], 
+                        release=book['release']
+                    )
 
-    def parse(self, response):
-        print(response.url)
-        title = response.css("ol.breadcrumb li.active::text").get().strip()
+        # Iterate and fetch chapter
+        fetched_url = [chapter.fullurl for chapter in book.chapters()]
+        chapter_urls = [url for url in response.css('ul.version-chap li a::attr(href)').extract() if not url in fetched_url]
+        if chapter_urls:
+            chapter_url = chapter_urls.pop()
+
+            yield scrapy.Request(
+                url=chapter_url,
+                callback=self.parse_chapter,
+                meta={'book': book, 'chapter_urls': chapter_urls}
+            )
+
+    def parse_chapter(self, response):
+        book = response.meta['book']
+        chapter_urls = response.meta['chapter_urls']
         
-        container = response.css("div.cha-words p").getall() if response.css("div.cha-words p").getall() else  response.css("div.text-left p").getall()
+        container = response.css("div.cha-words p").getall() if response.css("div.cha-words p").getall() else response.css("div.text-left p").getall()
         content = []
-        for p in container:
-            content.append(str(p))
-        
-        return {
-            'title' : title,
+        for line in [str(p) for p in container]:
+            content += [DataProcess.fix_bracket(s.strip()) for s in re.findall("^<p>(.+)</p>$", line)]
+        content = str("\n").join(content)
+
+        chapter = {
+            'title' : response.css("ol.breadcrumb li.active::text").get().strip(),
             'content' : content,
-            'book_url': self.book,
-            'url' : response.url.split("/")[-2]
+            'fullurl' : response.url,
+            'url' : response.url.split("/")[-2],
         }
+        chapter = Controller.create_chapter(
+                            book, 
+                            chapter['title'], 
+                            chapter['fullurl'], 
+                            chapter['url'], 
+                            content=DataProcess.encode_text(chapter['content']), 
+                            is_published=True
+                        )
+
+        if not chapter_urls:
+            yield book
+        else:
+            chapter_url = chapter_urls.pop()
+            yield scrapy.Request(
+                url=chapter_url,
+                callback=self.parse_chapter,
+                meta={'book': book, 'chapter_urls': chapter_urls}
+            )  
         
-# from scrapy.crawler import CrawlerProcess
-# process = CrawlerProcess()
-# process.crawl(BookSpider, book="a-stay-at-home-dads-restaurant-in-an-alternate-world")
-# process.start()
