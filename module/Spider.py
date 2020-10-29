@@ -52,19 +52,17 @@ class ReaderSpider(scrapy.Spider):
 
         # Iterate and fetch chapter
         fetched_url = [chapter.fullurl for chapter in book.chapters()]
-        chapter_urls = [url for url in response.css('ul.version-chap li a::attr(href)').extract() if not url in fetched_url]
+        chapter_urls = [url for url in response.css('ul.version-chap li a::attr(href)').extract() if not url in fetched_url] #filter already scrapped chapter
         if chapter_urls:
-            chapter_url = chapter_urls.pop()
-
-            yield scrapy.Request(
-                url=chapter_url,
-                callback=self.parse_chapter,
-                meta={'book': book, 'chapter_urls': chapter_urls}
-            )
+            for chapter_url in chapter_urls: # Loop For Async Request for faster scrap
+                yield scrapy.Request(
+                    url=chapter_url,
+                    callback=self.parse_chapter,
+                    meta={'book': book}
+                )
 
     def parse_chapter(self, response):
         book = response.meta['book']
-        chapter_urls = response.meta['chapter_urls']
         
         container = response.css("div.cha-words p").getall() if response.css("div.cha-words p").getall() else response.css("div.text-left p").getall()
         content = []
@@ -87,13 +85,5 @@ class ReaderSpider(scrapy.Spider):
                             is_published=True
                         )
 
-        if not chapter_urls:
-            yield book
-        else:
-            chapter_url = chapter_urls.pop()
-            yield scrapy.Request(
-                url=chapter_url,
-                callback=self.parse_chapter,
-                meta={'book': book, 'chapter_urls': chapter_urls}
-            )  
+        yield book
         

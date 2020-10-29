@@ -23,5 +23,8 @@ from module.Model import db, Author, Genre, Status, Book, Chapter, BookAuthor, B
 
 
 process = CrawlerProcess()
-process.crawl(ReaderSpider, books="a-stay-at-home-dads-restaurant-in-an-alternate-world")
+process.crawl(ReaderSpider, books=["mmorpg-rebirth-of-the-legendary-guardian", "a-stay-at-home-dads-restaurant-in-an-alternate-world"])
 process.start()
+
+book = Book.get(Book.url == "mmorpg-rebirth-of-the-legendary-guardian" )
+[print(chapter.url) for chapter in book.chapters()]

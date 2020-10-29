@@ -1,6 +1,7 @@
 import os
 from peewee import *
 import datetime
+from .DataProcess import DataProcess
 
 db_path = os.path.join( __file__, "..", "Novel.db" )
 db = SqliteDatabase(db_path)
@@ -28,6 +29,7 @@ class Book(BaseModel):
 
     def chapters(self):
         chapters = [chapter for chapter in Chapter.select().where(Chapter.book == self.id)]
+        chapters.sort(key= lambda k : DataProcess.natural_keys(k.url))
         return chapters
 
     def authors(self):
