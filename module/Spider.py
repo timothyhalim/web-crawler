@@ -24,7 +24,9 @@ class ReaderSpider(scrapy.Spider):
             'authors' : response.css('div.author-content a::text').getall(),
             'genres' : response.css('div.genres-content a::text').getall(),
             'status' : response.css('div.post-status div.post-content_item:nth-child(2) div.summary-content::text').get().strip(),
-            'release' : response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content::text').get().strip(),
+            'release' : response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content::text').get().strip()\
+                    if response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content::text').get().strip() \
+                    else str(response.css('div.post-status div.post-content_item:nth-child(1) div.summary-content a::text').get().strip()),
             'summary' : response.css('div.summary__content p').getall(),
             'chapters' : []
         }

@@ -27,4 +27,4 @@ process.crawl(ReaderSpider, books=["mmorpg-rebirth-of-the-legendary-guardian", "
 process.start()
 
 book = Book.get(Book.url == "mmorpg-rebirth-of-the-legendary-guardian" )
-[print(chapter.url) for chapter in book.chapters()]
+# [print(chapter.url) for chapter in book.chapters()]
